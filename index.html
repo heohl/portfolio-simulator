@@ -385,6 +385,80 @@
 
     scrollbar-width: thin;
     scrollbar-color: var(--border) transparent;
+
+    /* ── Scenarios ────────────────────────────────────── */
+    .save-row {
+      display: flex;
+      gap: 6px;
+    }
+    .save-row input[type=text] {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      padding: 7px 10px;
+      font-size: 0.82rem;
+      outline: none;
+    }
+    .save-row input[type=text]:focus { border-color: var(--accent); }
+    .save-row input[type=text]::placeholder { color: var(--text-muted); }
+    .save-row .save-btn {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      padding: 7px 11px;
+      font-size: 0.82rem;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: border-color 0.15s;
+    }
+    .save-row .save-btn:hover { border-color: var(--accent); }
+
+    .scenario-list { display: flex; flex-direction: column; gap: 5px; }
+    .scenario-item {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .scenario-item:hover { border-color: var(--accent); }
+    .scenario-name {
+      flex: 1;
+      font-size: 0.8rem;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .scenario-date { font-size: 0.68rem; color: var(--text-muted); white-space: nowrap; }
+    .scenario-load-btn {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--accent2);
+      font-size: 0.72rem;
+      padding: 3px 7px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .scenario-load-btn:hover { background: rgba(0,212,170,0.1); }
+    .scenario-del-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      cursor: pointer;
+      padding: 2px 4px;
+      border-radius: 4px;
+      line-height: 1;
+    }
+    .scenario-del-btn:hover { color: var(--red); }
+    .no-scenarios { font-size: 0.76rem; color: var(--text-muted); text-align: center; padding: 8px 0; }
   </style>
 </head>
 <body>
@@ -483,6 +557,13 @@
     </div>
 
     <button class="run-btn" id="run-btn" onclick="runSim()">▶ Simulation starten</button>
+
+    <div class="section-label">Szenarien</div>
+    <div class="save-row">
+      <input type="text" id="scenario-name" placeholder="Name des Szenarios…" maxlength="40">
+      <button class="save-btn" onclick="saveScenario()">💾 Speichern</button>
+    </div>
+    <div class="scenario-list" id="scenario-list"></div>
   </aside>
 
   <!-- ── MAIN ── -->
@@ -948,13 +1029,68 @@ function selectTransfer(key) {
 
 // ── Auto-run on load ──────────────────────────────────────
 window.addEventListener('load', () => {
-  // Sync labels
   ['start','savings','ret','vol','years','sims'].forEach(k => syncParam(k, P[k]));
+  renderScenarios();
   runSim();
 });
 
 // ── Canvas resize ─────────────────────────────────────────
 window.addEventListener('resize', () => { if (lastPaths) redraw(); });
+
+// ── Scenarios (localStorage) ──────────────────────────────
+const STORAGE_KEY = 'mc_planner_scenarios';
+
+function loadScenarioList() {
+  return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+}
+
+function saveScenario() {
+  const nameInput = document.getElementById('scenario-name');
+  const name = nameInput.value.trim() || 'Szenario ' + new Date().toLocaleDateString('de-DE');
+  const scenarios = loadScenarioList();
+  scenarios.unshift({
+    id:       Date.now().toString(),
+    name,
+    params:   { ...P },
+    savedAt:  new Date().toLocaleDateString('de-DE'),
+  });
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(scenarios));
+  nameInput.value = '';
+  renderScenarios();
+}
+
+function applyScenario(id) {
+  const scenario = loadScenarioList().find(s => s.id === id);
+  if (!scenario) return;
+  Object.assign(P, scenario.params);
+  Object.keys(scenario.params).forEach(k => syncParam(k, scenario.params[k]));
+  runSim();
+}
+
+function deleteScenario(id) {
+  const updated = loadScenarioList().filter(s => s.id !== id);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+  renderScenarios();
+}
+
+function renderScenarios() {
+  const list = document.getElementById('scenario-list');
+  const scenarios = loadScenarioList();
+  if (scenarios.length === 0) {
+    list.innerHTML = '<div class="no-scenarios">Noch keine Szenarien gespeichert.</div>';
+    return;
+  }
+  list.innerHTML = scenarios.map(s => `
+    <div class="scenario-item">
+      <div style="flex:1;min-width:0">
+        <div class="scenario-name" title="${s.name}">${s.name}</div>
+        <div class="scenario-date">${s.savedAt}</div>
+      </div>
+      <button class="scenario-load-btn" onclick="applyScenario('${s.id}')">Laden</button>
+      <button class="scenario-del-btn" onclick="deleteScenario('${s.id}')" title="Löschen">✕</button>
+    </div>
+  `).join('');
+}
 </script>
 </body>
 </html>

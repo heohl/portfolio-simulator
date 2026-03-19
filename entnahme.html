@@ -208,6 +208,20 @@
     .toggle input:checked + .slider-t { background: var(--orange); }
     .toggle input:checked + .slider-t::before { transform: translateX(16px); }
 
+    /* ── Import banner ────────────────────────────────── */
+    .import-banner {
+      background: rgba(0,212,170,0.08);
+      border: 1px solid rgba(0,212,170,0.35);
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: 0.76rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+      display: none;
+    }
+    .import-banner strong { color: var(--accent2); }
+    .import-banner.visible { display: block; }
+
     /* ── Info box ─────────────────────────────────────── */
     .info-box {
       background: rgba(249,115,22,0.08);
@@ -451,6 +465,11 @@
         <input type="checkbox" id="toggle-start" checked onchange="redraw()">
         <span class="slider-t"></span>
       </label>
+    </div>
+
+    <div class="import-banner" id="import-banner">
+      ✅ <strong>Werte aus dem Investment Planner übernommen:</strong>
+      Startkapital, Rendite &amp; Volatilität wurden automatisch eingetragen.
     </div>
 
     <div class="info-box">
@@ -883,6 +902,20 @@ function updateStats(stats, paths, months) {
 
 // ── Auto-run on load ──────────────────────────────────────
 window.addEventListener('load', () => {
+  // Read URL params from Investment Planner transfer
+  const params = new URLSearchParams(window.location.search);
+  if (params.has('start')) {
+    const imported = {
+      start: parseFloat(params.get('start')),
+      ret:   parseFloat(params.get('ret')),
+      vol:   parseFloat(params.get('vol')),
+    };
+    if (!isNaN(imported.start)) P.start = Math.round(imported.start);
+    if (!isNaN(imported.ret))   P.ret   = imported.ret;
+    if (!isNaN(imported.vol))   P.vol   = imported.vol;
+    document.getElementById('import-banner').classList.add('visible');
+  }
+
   ['start','withdraw','ret','vol','years','sims'].forEach(k => syncParam(k, P[k]));
   runSim();
 });

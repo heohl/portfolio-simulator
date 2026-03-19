@@ -342,6 +342,47 @@
     .prob-bar-fill { height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--accent), var(--accent2)); transition: width 0.6s cubic-bezier(0.34,1.56,0.64,1); }
     .prob-val { font-size: 0.9rem; font-weight: 700; color: var(--accent2); min-width: 40px; text-align: right; }
 
+    /* ── Transfer card ────────────────────────────────── */
+    .transfer-card {
+      background: var(--surface);
+      border: 1px solid var(--accent);
+      border-radius: 12px;
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .transfer-card.hidden { display: none; }
+    .transfer-card-label { font-size: 0.85rem; font-weight: 600; margin-bottom: 3px; }
+    .transfer-card-sub { font-size: 0.75rem; color: var(--text-muted); }
+    .transfer-options { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .transfer-opt-btn {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      padding: 7px 12px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .transfer-opt-btn:hover { border-color: var(--accent); background: var(--bg); }
+    .transfer-go-btn {
+      background: var(--accent);
+      border: none;
+      border-radius: 8px;
+      color: #fff;
+      padding: 8px 18px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      cursor: pointer;
+      text-decoration: none;
+      transition: opacity 0.15s;
+    }
+    .transfer-go-btn:hover { opacity: 0.85; }
+
     scrollbar-width: thin;
     scrollbar-color: var(--border) transparent;
   </style>
@@ -502,6 +543,20 @@
         <div class="label">Risiko-Spread</div>
         <div class="value" id="s-spread">—</div>
         <div class="sub">Best Case − Worst Case</div>
+      </div>
+    </div>
+
+    <!-- Transfer to Entnahmerechner -->
+    <div class="transfer-card hidden" id="transfer-card">
+      <div>
+        <div class="transfer-card-label">📤 Im Entnahmerechner fortführen</div>
+        <div class="transfer-card-sub">Marktparameter &amp; gewählten Endwert als Startkapital übernehmen</div>
+      </div>
+      <div class="transfer-options">
+        <button class="transfer-opt-btn" id="t-btn-median" onclick="selectTransfer('median')">Median: <strong id="t-median">—</strong></button>
+        <button class="transfer-opt-btn" id="t-btn-mean"   onclick="selectTransfer('mean')">Mittelwert: <strong id="t-mean">—</strong></button>
+        <button class="transfer-opt-btn" id="t-btn-p95"    onclick="selectTransfer('p95')">Best Case: <strong id="t-p95">—</strong></button>
+        <a class="transfer-go-btn" id="transfer-link" href="#">→ Übernehmen</a>
       </div>
     </div>
   </main>
@@ -846,6 +901,49 @@ function updateStats(stats, invested, paths, months) {
   const prob = (profitable / paths.length * 100).toFixed(1);
   document.getElementById('prob-bar').style.width = prob + '%';
   document.getElementById('prob-val').textContent = prob + ' %';
+
+  // Transfer card
+  document.getElementById('t-median').textContent = fmt(endMedian, 0) + ' €';
+  document.getElementById('t-mean').textContent   = fmt(endMean, 0) + ' €';
+  document.getElementById('t-p95').textContent    = fmt(endP95, 0) + ' €';
+  document.getElementById('transfer-card').classList.remove('hidden');
+  selectTransfer('median'); // default selection
+}
+
+// ── Transfer to Entnahmerechner ───────────────────────────
+let transferValue = 0;
+
+function selectTransfer(key) {
+  const map = {
+    median: parseFloat(document.getElementById('t-median').textContent.replace(/[^0-9,]/g, '').replace(',', '.')),
+    mean:   parseFloat(document.getElementById('t-mean').textContent.replace(/[^0-9,]/g, '').replace(',', '.')),
+    p95:    parseFloat(document.getElementById('t-p95').textContent.replace(/[^0-9,]/g, '').replace(',', '.')),
+  };
+
+  // Parse formatted German number correctly
+  const stats_end = { median: null, mean: null, p95: null };
+  if (lastPaths) {
+    const months = Math.round(P.years * 12);
+    const tmp = lastPaths.map(p => p[months]).sort((a, b) => a - b);
+    const sum = tmp.reduce((a, b) => a + b, 0);
+    stats_end.median = tmp[Math.floor(tmp.length * 0.5)];
+    stats_end.mean   = sum / tmp.length;
+    stats_end.p95    = tmp[Math.floor(tmp.length * 0.95)];
+  }
+
+  transferValue = Math.round(stats_end[key] || 0);
+
+  // Highlight active button
+  ['median', 'mean', 'p95'].forEach(k => {
+    document.getElementById('t-btn-' + k).style.borderColor = k === key ? 'var(--accent)' : '';
+  });
+
+  const params = new URLSearchParams({
+    start: transferValue,
+    ret:   P.ret,
+    vol:   P.vol,
+  });
+  document.getElementById('transfer-link').href = 'entnahme.html?' + params.toString();
 }
 
 // ── Auto-run on load ──────────────────────────────────────

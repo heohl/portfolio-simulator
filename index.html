@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Monte Carlo Investment Planner</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #222536;
+      --border: #2e3249;
+      --accent: #6c63ff;
+      --accent2: #00d4aa;
+      --accent3: #ff6b6b;
+      --text: #e8eaf0;
+      --text-muted: #7b82a0;
+      --green: #22c55e;
+      --red: #ef4444;
+      --yellow: #f59e0b;
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ─────────────────────────────────────── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 28px;
+      display: flex;
+      align-items: stretch;
+      gap: 0;
+    }
+    .header-brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 14px 0;
+      margin-right: 32px;
+    }
+    header h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+    header .badge {
+      background: var(--accent);
+      color: #fff;
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 99px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    nav {
+      display: flex;
+      align-items: stretch;
+      gap: 4px;
+    }
+    nav a {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 0 16px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-decoration: none;
+      border-bottom: 2px solid transparent;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    nav a:hover { color: var(--text); }
+    nav a.active { color: var(--text); border-bottom-color: var(--accent); }
+
+    /* ── Layout ──────────────────────────────────────── */
+    .layout {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+      height: calc(100vh - 57px);
+    }
+
+    /* ── Sidebar ─────────────────────────────────────── */
+    aside {
+      width: 310px;
+      min-width: 310px;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      overflow-y: auto;
+      padding: 20px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .section-label {
+      font-size: 0.65rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      padding: 12px 0 4px;
+    }
+
+    .param-row {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .param-row label {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .param-row label span.val {
+      font-weight: 700;
+      color: var(--text);
+      font-size: 0.9rem;
+    }
+    .param-row input[type=range] {
+      width: 100%;
+      accent-color: var(--accent);
+      cursor: pointer;
+      height: 4px;
+    }
+    .param-row .num-input {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      padding: 5px 8px;
+      font-size: 0.85rem;
+      outline: none;
+    }
+    .param-row .num-input:focus {
+      border-color: var(--accent);
+    }
+
+    .run-btn {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 12px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      width: 100%;
+      margin-top: 10px;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+    .run-btn:hover { opacity: 0.88; }
+    .run-btn:active { transform: scale(0.98); }
+    .run-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+    .toggle {
+      position: relative;
+      width: 36px;
+      height: 20px;
+    }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .toggle .slider-t {
+      position: absolute;
+      inset: 0;
+      background: var(--border);
+      border-radius: 99px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .toggle .slider-t::before {
+      content: '';
+      position: absolute;
+      width: 14px; height: 14px;
+      left: 3px; top: 3px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform 0.2s;
+    }
+    .toggle input:checked + .slider-t { background: var(--accent); }
+    .toggle input:checked + .slider-t::before { transform: translateX(16px); }
+
+    /* ── Main ────────────────────────────────────────── */
+    main {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .chart-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 20px;
+      position: relative;
+    }
+    .chart-card h2 {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      margin-bottom: 14px;
+      font-weight: 600;
+    }
+
+    /* canvas container */
+    .canvas-wrap {
+      position: relative;
+      width: 100%;
+      height: 420px;
+    }
+    #bgCanvas {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      border-radius: 6px;
+    }
+    #mainChart {
+      position: relative;
+      z-index: 1;
+    }
+
+    .loading-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(15,17,23,0.75);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 14px;
+      z-index: 10;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      gap: 10px;
+    }
+    .spinner {
+      width: 22px; height: 22px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-overlay.hidden { display: none; }
+
+    /* ── Stats Grid ───────────────────────────────────── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px 18px;
+    }
+    .stat-card .label {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+      font-weight: 600;
+    }
+    .stat-card .value {
+      font-size: 1.35rem;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+    }
+    .stat-card .sub {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      margin-top: 3px;
+    }
+    .stat-card.green .value { color: var(--green); }
+    .stat-card.red .value { color: var(--red); }
+    .stat-card.yellow .value { color: var(--yellow); }
+    .stat-card.accent .value { color: var(--accent); }
+    .stat-card.accent2 .value { color: var(--accent2); }
+
+    /* ── Legend ───────────────────────────────────────── */
+    .legend {
+      display: flex;
+      gap: 18px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+    .legend-dot {
+      width: 22px;
+      height: 3px;
+      border-radius: 2px;
+    }
+
+    /* ── Probability Bar ──────────────────────────────── */
+    .prob-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 16px;
+    }
+    .prob-label { font-size: 0.78rem; color: var(--text-muted); white-space: nowrap; }
+    .prob-bar-wrap { flex: 1; background: var(--border); border-radius: 99px; height: 8px; overflow: hidden; }
+    .prob-bar-fill { height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--accent), var(--accent2)); transition: width 0.6s cubic-bezier(0.34,1.56,0.64,1); }
+    .prob-val { font-size: 0.9rem; font-weight: 700; color: var(--accent2); min-width: 40px; text-align: right; }
+
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-brand">
+    <span style="font-size:1.4rem">💰</span>
+    <h1>Monte Carlo Planner</h1>
+    <span class="badge">Beta</span>
+  </div>
+  <nav>
+    <a href="index.html" class="active">📈 Investment Planner</a>
+    <a href="entnahme.html">📤 Entnahmerechner</a>
+  </nav>
+</header>
+
+<div class="layout">
+  <!-- ── SIDEBAR ── -->
+  <aside>
+    <div class="section-label">Kapital & Sparplan</div>
+
+    <div class="param-row">
+      <label>Startkapital <span class="val" id="lbl-start">10.000 €</span></label>
+      <input type="range" id="r-start" min="1000" max="1000000" step="1000" value="10000"
+             oninput="syncParam('start', this.value)">
+      <input type="number" class="num-input" id="n-start" value="10000" min="0"
+             oninput="syncParam('start', this.value)">
+    </div>
+
+    <div class="param-row">
+      <label>Monatliche Sparrate <span class="val" id="lbl-savings">200 €</span></label>
+      <input type="range" id="r-savings" min="0" max="10000" step="50" value="200"
+             oninput="syncParam('savings', this.value)">
+      <input type="number" class="num-input" id="n-savings" value="200" min="0"
+             oninput="syncParam('savings', this.value)">
+    </div>
+
+    <div class="section-label">Marktparameter</div>
+
+    <div class="param-row">
+      <label>Erwartete Jahresrendite <span class="val" id="lbl-ret">7 %</span></label>
+      <input type="range" id="r-ret" min="0" max="20" step="0.5" value="7"
+             oninput="syncParam('ret', this.value)">
+      <input type="number" class="num-input" id="n-ret" value="7" min="0" max="100" step="0.5"
+             oninput="syncParam('ret', this.value)">
+    </div>
+
+    <div class="param-row">
+      <label>Jährliche Volatilität <span class="val" id="lbl-vol">15 %</span></label>
+      <input type="range" id="r-vol" min="0" max="50" step="0.5" value="15"
+             oninput="syncParam('vol', this.value)">
+      <input type="number" class="num-input" id="n-vol" value="15" min="0" max="100" step="0.5"
+             oninput="syncParam('vol', this.value)">
+    </div>
+
+    <div class="section-label">Simulation</div>
+
+    <div class="param-row">
+      <label>Anlagezeitraum <span class="val" id="lbl-years">20 Jahre</span></label>
+      <input type="range" id="r-years" min="1" max="50" step="1" value="20"
+             oninput="syncParam('years', this.value)">
+      <input type="number" class="num-input" id="n-years" value="20" min="1" max="100"
+             oninput="syncParam('years', this.value)">
+    </div>
+
+    <div class="param-row">
+      <label>Anzahl Simulationen <span class="val" id="lbl-sims">500</span></label>
+      <input type="range" id="r-sims" min="50" max="2000" step="50" value="500"
+             oninput="syncParam('sims', this.value)">
+      <input type="number" class="num-input" id="n-sims" value="500" min="50" max="2000" step="50"
+             oninput="syncParam('sims', this.value)">
+    </div>
+
+    <div class="section-label">Anzeige</div>
+
+    <div class="toggle-row">
+      <span>Spaghetti-Pfade anzeigen</span>
+      <label class="toggle">
+        <input type="checkbox" id="toggle-paths" checked onchange="redraw()">
+        <span class="slider-t"></span>
+      </label>
+    </div>
+    <div class="toggle-row">
+      <span>Konfidenzband (5 – 95 %)</span>
+      <label class="toggle">
+        <input type="checkbox" id="toggle-band" checked onchange="redraw()">
+        <span class="slider-t"></span>
+      </label>
+    </div>
+    <div class="toggle-row">
+      <span>Investiertes Kapital</span>
+      <label class="toggle">
+        <input type="checkbox" id="toggle-invested" checked onchange="redraw()">
+        <span class="slider-t"></span>
+      </label>
+    </div>
+
+    <button class="run-btn" id="run-btn" onclick="runSim()">▶ Simulation starten</button>
+  </aside>
+
+  <!-- ── MAIN ── -->
+  <main>
+    <!-- Chart -->
+    <div class="chart-card" id="chart-card">
+      <h2>Portfolioentwicklung — Monte-Carlo-Simulation</h2>
+      <div class="legend" id="legend">
+        <div class="legend-item"><div class="legend-dot" style="background:#6c63ff"></div> Investiertes Kapital</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#00d4aa"></div> Mittelwert</div>
+        <div class="legend-item"><div class="legend-dot" style="background:rgba(108,99,255,0.35);height:10px;border-radius:3px"></div> Konfidenzband 5–95 %</div>
+        <div class="legend-item"><div class="legend-dot" style="background:rgba(255,255,255,0.12)"></div> Einzelpfade</div>
+      </div>
+      <div class="canvas-wrap" id="canvas-wrap">
+        <canvas id="bgCanvas"></canvas>
+        <canvas id="mainChart"></canvas>
+        <div class="loading-overlay hidden" id="loading">
+          <div class="spinner"></div> Simuliere…
+        </div>
+      </div>
+    </div>
+
+    <!-- Probability row -->
+    <div class="prob-row">
+      <span class="prob-label">Wahrscheinlichkeit, mehr als das Eingesetzte zu haben</span>
+      <div class="prob-bar-wrap"><div class="prob-bar-fill" id="prob-bar" style="width:0%"></div></div>
+      <span class="prob-val" id="prob-val">—</span>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="label">Investiertes Kapital</div>
+        <div class="value" id="s-invested">—</div>
+        <div class="sub">nach Ablauf des Zeitraums</div>
+      </div>
+      <div class="stat-card accent2">
+        <div class="label">Mittelwert (Mean)</div>
+        <div class="value" id="s-mean">—</div>
+        <div class="sub" id="s-mean-sub">Ø Endwert aller Simulationen</div>
+      </div>
+      <div class="stat-card accent">
+        <div class="label">Median (50. Perz.)</div>
+        <div class="value" id="s-median">—</div>
+        <div class="sub">mittleres Szenario</div>
+      </div>
+      <div class="stat-card green">
+        <div class="label">Best Case (95. Perz.)</div>
+        <div class="value" id="s-p95">—</div>
+        <div class="sub">obere Grenze Konfidenz</div>
+      </div>
+      <div class="stat-card red">
+        <div class="label">Worst Case (5. Perz.)</div>
+        <div class="value" id="s-p5">—</div>
+        <div class="sub">untere Grenze Konfidenz</div>
+      </div>
+      <div class="stat-card yellow">
+        <div class="label">Risiko-Spread</div>
+        <div class="value" id="s-spread">—</div>
+        <div class="sub">Best Case − Worst Case</div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+// ── State ─────────────────────────────────────────────────
+const P = {
+  start:   10000,
+  savings: 200,
+  ret:     7,
+  vol:     15,
+  years:   20,
+  sims:    500,
+};
+
+let lastPaths = null;  // all simulation results
+let chart = null;
+let chartYearStep = 1;  // shared with chart tick callback
+
+// ── Sync sliders ↔ number inputs ──────────────────────────
+function syncParam(key, rawVal) {
+  const v = parseFloat(rawVal) || 0;
+  P[key] = v;
+
+  const labels = {
+    start:   () => fmt(v, 0) + ' €',
+    savings: () => fmt(v, 0) + ' €',
+    ret:     () => v.toFixed(1) + ' %',
+    vol:     () => v.toFixed(1) + ' %',
+    years:   () => v + ' Jahr' + (v === 1 ? '' : 'e'),
+    sims:    () => v.toLocaleString('de-DE'),
+  };
+  document.getElementById('lbl-' + key).textContent = labels[key]();
+
+  const slider = document.getElementById('r-' + key);
+  const number = document.getElementById('n-' + key);
+  if (slider && parseFloat(slider.value) !== v) slider.value = v;
+  if (number && parseFloat(number.value) !== v) number.value = v;
+}
+
+// ── Number format ─────────────────────────────────────────
+function fmt(n, dec = 0) {
+  if (n >= 1e6) return (n / 1e6).toFixed(2) + ' Mio.';
+  return n.toLocaleString('de-DE', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+}
+
+// ── Normal random (Box-Muller) ────────────────────────────
+function randNorm() {
+  let u, v;
+  do { u = Math.random(); } while (u === 0);
+  do { v = Math.random(); } while (v === 0);
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+
+// ── Core simulation ───────────────────────────────────────
+function simulate(params) {
+  const { start, savings, ret, vol, years, sims } = params;
+  const months = Math.round(years * 12);
+  const mu  = ret  / 100;
+  const sig = vol  / 100;
+  const dt  = 1 / 12;
+  const drift = (mu - 0.5 * sig * sig) * dt;
+  const sigSqrtDt = sig * Math.sqrt(dt);
+
+  const paths = [];
+  for (let s = 0; s < sims; s++) {
+    const path = new Float64Array(months + 1);
+    path[0] = start;
+    let v = start;
+    for (let m = 1; m <= months; m++) {
+      v = (v + savings) * Math.exp(drift + sigSqrtDt * randNorm());
+      path[m] = v;
+    }
+    paths.push(path);
+  }
+  return { paths, months };
+}
+
+// ── Compute statistics at each step ──────────────────────
+function computeStats(paths, months) {
+  const mean   = new Float64Array(months + 1);
+  const p5     = new Float64Array(months + 1);
+  const p95    = new Float64Array(months + 1);
+  const median = new Float64Array(months + 1);
+
+  const tmp = new Float64Array(paths.length);
+  for (let m = 0; m <= months; m++) {
+    for (let s = 0; s < paths.length; s++) tmp[s] = paths[s][m];
+    tmp.sort();
+    let sum = 0;
+    for (let s = 0; s < tmp.length; s++) sum += tmp[s];
+    mean[m]   = sum / tmp.length;
+    p5[m]     = tmp[Math.floor(tmp.length * 0.05)];
+    p95[m]    = tmp[Math.floor(tmp.length * 0.95)];
+    median[m] = tmp[Math.floor(tmp.length * 0.5)];
+  }
+  return { mean, p5, p95, median };
+}
+
+// ── Compute invested capital ──────────────────────────────
+function investedCapital(start, savings, months) {
+  const arr = new Float64Array(months + 1);
+  arr[0] = start;
+  for (let m = 1; m <= months; m++) arr[m] = start + savings * m;
+  return arr;
+}
+
+// ── Draw spaghetti on bgCanvas ───────────────────────────
+function drawSpaghettiCanvas(paths, months, chartArea, xScale, yScale) {
+  const bg = document.getElementById('bgCanvas');
+  const wrap = document.getElementById('canvas-wrap');
+  bg.width  = wrap.clientWidth;
+  bg.height = wrap.clientHeight;
+  const ctx = bg.getContext('2d');
+  ctx.clearRect(0, 0, bg.width, bg.height);
+
+  if (!document.getElementById('toggle-paths').checked) return;
+
+  const MAX_DRAW = Math.min(paths.length, 300);
+  ctx.globalAlpha = Math.max(0.03, Math.min(0.18, 12 / MAX_DRAW));
+  ctx.strokeStyle = '#a0aec0';
+  ctx.lineWidth = 0.8;
+
+  for (let s = 0; s < MAX_DRAW; s++) {
+    ctx.beginPath();
+    for (let m = 0; m <= months; m++) {
+      const x = chartArea.left + (m / months) * (chartArea.right - chartArea.left);
+      const y = yScale(paths[s][m]);
+      m === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ── Build Chart.js datasets ───────────────────────────────
+function buildDatasets(months, stats, invested, showBand, showInvested) {
+  const totalYears = months / 12;
+  chartYearStep = totalYears <= 10 ? 1 : totalYears <= 25 ? 2 : totalYears <= 40 ? 5 : 10;
+  const labels = Array.from({ length: months + 1 }, (_, i) => i);
+
+  const datasets = [];
+
+  // Confidence band (fill between p5 and p95)
+  if (showBand) {
+    datasets.push({
+      label: '95. Perzentil',
+      data: Array.from(stats.p95),
+      borderColor: 'rgba(108,99,255,0.5)',
+      backgroundColor: 'rgba(108,99,255,0.12)',
+      borderWidth: 1.5,
+      borderDash: [4, 3],
+      pointRadius: 0,
+      fill: '+1',
+      tension: 0.3,
+      order: 3,
+    });
+    datasets.push({
+      label: '5. Perzentil',
+      data: Array.from(stats.p5),
+      borderColor: 'rgba(108,99,255,0.5)',
+      backgroundColor: 'rgba(108,99,255,0.12)',
+      borderWidth: 1.5,
+      borderDash: [4, 3],
+      pointRadius: 0,
+      fill: false,
+      tension: 0.3,
+      order: 3,
+    });
+  }
+
+  // Mean
+  datasets.push({
+    label: 'Mittelwert',
+    data: Array.from(stats.mean),
+    borderColor: '#00d4aa',
+    backgroundColor: 'transparent',
+    borderWidth: 2.5,
+    pointRadius: 0,
+    tension: 0.3,
+    order: 2,
+  });
+
+  // Invested
+  if (showInvested) {
+    datasets.push({
+      label: 'Investiertes Kapital',
+      data: Array.from(invested),
+      borderColor: '#6c63ff',
+      backgroundColor: 'transparent',
+      borderWidth: 2,
+      borderDash: [6, 4],
+      pointRadius: 0,
+      tension: 0,
+      order: 1,
+    });
+  }
+
+  return { labels, datasets };
+}
+
+// ── Main run ──────────────────────────────────────────────
+async function runSim() {
+  const btn = document.getElementById('run-btn');
+  const loading = document.getElementById('loading');
+  btn.disabled = true;
+  loading.classList.remove('hidden');
+
+  // yield to browser to show loading
+  await new Promise(r => setTimeout(r, 30));
+
+  const result = simulate(P);
+  lastPaths = result.paths;
+  const { months } = result;
+  const stats    = computeStats(result.paths, months);
+  const invested = investedCapital(P.start, P.savings, months);
+
+  redrawWithData(result.paths, months, stats, invested, true);
+  updateStats(stats, invested, result.paths, months);
+
+  loading.classList.add('hidden');
+  btn.disabled = false;
+}
+
+function redraw() {
+  if (!lastPaths) return;
+  const months = Math.round(P.years * 12);
+  const stats    = computeStats(lastPaths, months);
+  const invested = investedCapital(P.start, P.savings, months);
+  redrawWithData(lastPaths, months, stats, invested, false);
+}
+
+function redrawWithData(paths, months, stats, invested, animate = false) {
+  const showBand     = document.getElementById('toggle-band').checked;
+  const showInvested = document.getElementById('toggle-invested').checked;
+  const { labels, datasets } = buildDatasets(months, stats, invested, showBand, showInvested);
+
+  if (chart) {
+    chart.data.labels   = labels;
+    chart.data.datasets = datasets;
+    chart.update('none');
+  } else {
+    const ctx = document.getElementById('mainChart').getContext('2d');
+    chart = new Chart(ctx, {
+      type: 'line',
+      data: { labels, datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: '#1a1d27',
+            borderColor: '#2e3249',
+            borderWidth: 1,
+            titleColor: '#e8eaf0',
+            bodyColor: '#7b82a0',
+            padding: 12,
+            callbacks: {
+              label(ctx) {
+                return `  ${ctx.dataset.label}: ${fmt(ctx.parsed.y, 0)} €`;
+              },
+            },
+          },
+        },
+        scales: {
+          x: {
+            grid: { color: 'rgba(46,50,73,0.6)' },
+            afterBuildTicks(axis) {
+              const step = chartYearStep * 12;
+              axis.ticks = axis.ticks.filter(t => t.value % step === 0);
+            },
+            ticks: {
+              color: '#7b82a0',
+              maxRotation: 0,
+              callback(val) {
+                return `Jahr ${val / 12}`;
+              },
+            },
+          },
+          y: {
+            grid: { color: 'rgba(46,50,73,0.6)' },
+            ticks: {
+              color: '#7b82a0',
+              callback(v) { return fmt(v, 0) + ' €'; },
+            },
+          },
+        },
+      },
+    });
+  }
+
+  // Draw spaghetti on bg canvas after chart renders
+  setTimeout(() => {
+    if (!chart) return;
+    const ca = chart.chartArea;
+    if (!ca) return;
+    const yAxis = chart.scales.y;
+    function yScale(v) {
+      return ca.top + (ca.bottom - ca.top) * (1 - (v - yAxis.min) / (yAxis.max - yAxis.min));
+    }
+    drawSpaghettiCanvas(paths, months, ca, null, yScale);
+
+    if (animate) {
+      const wrap = document.getElementById('canvas-wrap');
+      wrap.style.transition = 'none';
+      wrap.style.clipPath = 'inset(0 100% 0 0)';
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          wrap.style.transition = 'clip-path 1.5s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+          wrap.style.clipPath = 'inset(0 0% 0 0)';
+        });
+      });
+    }
+  }, 50);
+}
+
+// ── Stats panel ───────────────────────────────────────────
+function updateStats(stats, invested, paths, months) {
+  const endInv    = invested[months];
+  const endMean   = stats.mean[months];
+  const endMedian = stats.median[months];
+  const endP5     = stats.p5[months];
+  const endP95    = stats.p95[months];
+  const spread    = endP95 - endP5;
+
+  document.getElementById('s-invested').textContent = fmt(endInv, 0) + ' €';
+  document.getElementById('s-mean').textContent     = fmt(endMean, 0) + ' €';
+  document.getElementById('s-mean-sub').textContent =
+    `Ø ${fmt(endMean - endInv, 0)} € Gewinn (${((endMean / endInv - 1) * 100).toFixed(1)} %)`;
+  document.getElementById('s-median').textContent   = fmt(endMedian, 0) + ' €';
+  document.getElementById('s-p95').textContent      = fmt(endP95, 0) + ' €';
+  document.getElementById('s-p5').textContent       = fmt(endP5, 0) + ' €';
+  document.getElementById('s-spread').textContent   = fmt(spread, 0) + ' €';
+
+  // Probability of profit
+  const endVals = paths.map(p => p[months]);
+  const profitable = endVals.filter(v => v > endInv).length;
+  const prob = (profitable / paths.length * 100).toFixed(1);
+  document.getElementById('prob-bar').style.width = prob + '%';
+  document.getElementById('prob-val').textContent = prob + ' %';
+}
+
+// ── Auto-run on load ──────────────────────────────────────
+window.addEventListener('load', () => {
+  // Sync labels
+  ['start','savings','ret','vol','years','sims'].forEach(k => syncParam(k, P[k]));
+  runSim();
+});
+
+// ── Canvas resize ─────────────────────────────────────────
+window.addEventListener('resize', () => { if (lastPaths) redraw(); });
+</script>
+</body>
+</html>
